@@ -1,0 +1,5 @@
+1. Check current settings with environment variables specified
+docker-compose --project-directory ../backend/ -f backend-docker-compose.yml config
+
+2. Run docker container from specified file and .env file located directly in the ../backend/ folder
+docker-compose --project-directory ../backend/ -f backend-docker-compose.yml up
