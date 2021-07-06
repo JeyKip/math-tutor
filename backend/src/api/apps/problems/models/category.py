@@ -12,6 +12,6 @@ class Category(ChangeDateInfoModel):
 
     class Meta:
         ordering = ["created"]
-        db_table = _("problems_categories")
+        db_table = "problems_categories"
         verbose_name = _("Category")
         verbose_name_plural = _("Categories")

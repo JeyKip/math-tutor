@@ -3,6 +3,7 @@ version: "3.6"
 services:
   math-tutor-postgres:
     image: postgres
+    command: "postgres -c logging_collector=on -c log_destination=stderr,csvlog -c log_statement=mod -c log_directory=/var/logs/postgresql"
     ports:
       - "5432:5432"
     environment:
@@ -11,6 +12,13 @@ services:
       POSTGRES_PASSWORD: ${PG_DATABASE_PASSWORD}
     volumes:
       - math-tutor-postgres:/var/lib/postgresql/data
+      - math-tutor-postgres-logs:/var/logs/postgresql
 
 volumes:
   math-tutor-postgres:
+  math-tutor-postgres-logs:
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: ${LOGS_DIRECTORY}
