@@ -120,7 +120,7 @@ class AdminQuestionChangeForm(forms.ModelForm):
     boolean_correct_answer = forms.ChoiceField(
         label=_("Correct Answer"),
         required=False,
-        choices=((None, "-==-"), ("Yes", _("Yes")), ("No", _("No")))
+        choices=(("", "---------"), ("Yes", _("Yes")), ("No", _("No")))
     )
 
     text_correct_answer = forms.CharField(
@@ -147,7 +147,7 @@ class AdminQuestionChangeForm(forms.ModelForm):
         required_field = f"{required_field_type}_correct_answer"
 
         question_type = self.__get_question_type()
-        correct_answer = self.cleaned_data[required_field]
+        correct_answer = self.cleaned_data.get(required_field)
 
         if question_type == required_field_type:
             if self.__correct_answer_is_empty(correct_answer):
@@ -178,10 +178,10 @@ class AdminQuestionChangeForm(forms.ModelForm):
         question_type = self.__get_question_type()
 
         if question_type in QUESTION_TYPES_TO_SAVE_CORRECT_ANSWER:
-            return self.cleaned_data[f"{question_type}_correct_answer"]
+            return self.cleaned_data.get(f"{question_type}_correct_answer")
 
     def __get_question_type(self):
-        return self.cleaned_data["type"].lower()
+        return self.cleaned_data.get("type", "").lower()
 
     class Meta:
         model = Question
@@ -213,6 +213,7 @@ class AdminQuestion(admin.ModelAdmin):
     def get_form(self, request, obj=None, change=False, **kwargs):
         form = super(AdminQuestion, self).get_form(request, obj, change, **kwargs)
         self.__initialize_correct_answer_fields(form, obj)
+        self.__disable_manage_buttons_for_category(form)
         return form
 
     def __initialize_correct_answer_fields(self, form, obj):
@@ -226,3 +227,9 @@ class AdminQuestion(admin.ModelAdmin):
             value = obj.correct_answer if obj_type == question_type else None
 
             form.base_fields[field_name].initial = value
+
+    def __disable_manage_buttons_for_category(self, form):
+        category_field = form.base_fields["category"]
+        category_field.widget.can_add_related = False
+        category_field.widget.can_change_related = False
+        category_field.widget.can_delete_related = False
