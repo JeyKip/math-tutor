@@ -1,8 +1,22 @@
+from collections import namedtuple
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import ui
 
 from api.apps.problems.models import Category, Question
 from .admin_e2e_base_test_case import AdminE2EBaseTestCase
+
+QuestionData = namedtuple("QuestionData", [
+    "category_name",
+    "question",
+    "complexity",
+    "number_of_points",
+    "correct_answer",
+    "max_attempts_to_solve",
+    "solution"
+])
+
+ElementsVisibility = namedtuple("ElementsVisibility", ["visible_elements", "invisible_elements"])
 
 
 class QuestionEditTestCase(AdminE2EBaseTestCase):
@@ -70,6 +84,49 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
     save_button_locator = (By.CSS_SELECTOR, ".submit-row [name=_save]")
     errornote_locator = (By.CLASS_NAME, "errornote", "Error note")
     options_locator = (By.ID, "options-group")
+
+    elements_visibility_by_type = {
+        Question.QuestionType.INTEGER.value: ElementsVisibility(
+            [integer_correct_answer_block_locator],
+            [decimal_correct_answer_block_locator, boolean_correct_answer_block_locator,
+             text_correct_answer_block_locator, options_locator]
+        ),
+        Question.QuestionType.DECIMAL.value: ElementsVisibility(
+            [decimal_correct_answer_block_locator],
+            [integer_correct_answer_block_locator, boolean_correct_answer_block_locator,
+             text_correct_answer_block_locator, options_locator]
+        ),
+        Question.QuestionType.BOOLEAN.value: ElementsVisibility(
+            [boolean_correct_answer_block_locator],
+            [integer_correct_answer_block_locator, decimal_correct_answer_block_locator,
+             text_correct_answer_block_locator, options_locator]
+        ),
+        Question.QuestionType.TEXT.value: ElementsVisibility(
+            [text_correct_answer_block_locator],
+            [integer_correct_answer_block_locator, decimal_correct_answer_block_locator,
+             boolean_correct_answer_block_locator, options_locator]
+        ),
+        Question.QuestionType.SINGLE_CHOICE.value: ElementsVisibility(
+            [options_locator],
+            [integer_correct_answer_block_locator, decimal_correct_answer_block_locator,
+             boolean_correct_answer_block_locator, text_correct_answer_block_locator]
+        ),
+        Question.QuestionType.MULTIPLE_CHOICE.value: ElementsVisibility(
+            [options_locator],
+            [integer_correct_answer_block_locator, decimal_correct_answer_block_locator,
+             boolean_correct_answer_block_locator, text_correct_answer_block_locator]
+        )
+    }
+
+    default_integer_question_data = QuestionData("Elementary Algebra", "2+2=?", Question.Complexity.EASY.value, 1, 4,
+                                                 None, None)
+    default_decimal_question_data = QuestionData("Elementary Algebra", "9/2=?", Question.Complexity.EASY.value, 1, 4.5,
+                                                 None, None)
+    default_boolean_question_data = QuestionData("Elementary Algebra",
+                                                 "The logarithm is the inverse function to exponentiation.",
+                                                 Question.Complexity.MEDIUM.value, 2, "Yes", None, None)
+    default_text_question_data = QuestionData("Elementary Algebra", "What is the inverse function to exponentiation?",
+                                              Question.Complexity.MEDIUM.value, 1, "Logarithm", None, None)
 
     def test_default_view_of_add_question_page(self):
         self.open_add_question_page()
@@ -296,42 +353,22 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
     def test_integer_type_selected_integer_correct_answer_should_be_shown(self):
         self.open_add_question_page()
         self.set_type_value(Question.QuestionType.INTEGER.value)
-
-        self.assertVisible(self.integer_correct_answer_block_locator)
-        self.assertInvisible(self.decimal_correct_answer_block_locator)
-        self.assertInvisible(self.boolean_correct_answer_block_locator)
-        self.assertInvisible(self.text_correct_answer_block_locator)
-        self.assertInvisible(self.options_locator)
+        self.assertVisibilityIsCorrectForType(Question.QuestionType.INTEGER.value)
 
     def test_decimal_type_selected_decimal_correct_answer_should_be_shown(self):
         self.open_add_question_page()
         self.set_type_value(Question.QuestionType.DECIMAL.value)
-
-        self.assertInvisible(self.integer_correct_answer_block_locator)
-        self.assertVisible(self.decimal_correct_answer_block_locator)
-        self.assertInvisible(self.boolean_correct_answer_block_locator)
-        self.assertInvisible(self.text_correct_answer_block_locator)
-        self.assertInvisible(self.options_locator)
+        self.assertVisibilityIsCorrectForType(Question.QuestionType.DECIMAL.value)
 
     def test_boolean_type_selected_boolean_correct_answer_should_be_shown(self):
         self.open_add_question_page()
         self.set_type_value(Question.QuestionType.BOOLEAN.value)
-
-        self.assertInvisible(self.integer_correct_answer_block_locator)
-        self.assertInvisible(self.decimal_correct_answer_block_locator)
-        self.assertVisible(self.boolean_correct_answer_block_locator)
-        self.assertInvisible(self.text_correct_answer_block_locator)
-        self.assertInvisible(self.options_locator)
+        self.assertVisibilityIsCorrectForType(Question.QuestionType.BOOLEAN.value)
 
     def test_text_type_selected_text_correct_answer_should_be_shown(self):
         self.open_add_question_page()
         self.set_type_value(Question.QuestionType.TEXT.value)
-
-        self.assertInvisible(self.integer_correct_answer_block_locator)
-        self.assertInvisible(self.decimal_correct_answer_block_locator)
-        self.assertInvisible(self.boolean_correct_answer_block_locator)
-        self.assertVisible(self.text_correct_answer_block_locator)
-        self.assertInvisible(self.options_locator)
+        self.assertVisibilityIsCorrectForType(Question.QuestionType.TEXT.value)
 
     def test_choice_type_selected_options_editor_with_empty_list_should_be_shown(self):
         self.open_add_question_page()
@@ -339,26 +376,19 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
         for question_type in [Question.QuestionType.SINGLE_CHOICE.value, Question.QuestionType.MULTIPLE_CHOICE.value]:
             with self.subTest(question_type=question_type):
                 self.set_type_value(question_type)
-
-                self.assertInvisible(self.integer_correct_answer_block_locator)
-                self.assertInvisible(self.decimal_correct_answer_block_locator)
-                self.assertInvisible(self.boolean_correct_answer_block_locator)
-                self.assertInvisible(self.text_correct_answer_block_locator)
-                self.assertVisible(self.options_locator)
+                self.assertVisibilityIsCorrectForType(question_type)
                 self.assertNOptions(0)
 
     def test_multiple_changes_of_type_only_block_for_latest_type_should_be_shown(self):
         self.open_add_question_page()
 
-        for question_type in Question.QuestionType.values + [Question.QuestionType.DECIMAL.value]:
+        extra_type = Question.QuestionType.DECIMAL.value
+
+        for question_type in Question.QuestionType.values + [extra_type]:
             self.set_type_value(question_type)
 
         # assert that after multiple changes only block for decimal type is shown
-        self.assertInvisible(self.integer_correct_answer_block_locator)
-        self.assertVisible(self.decimal_correct_answer_block_locator)
-        self.assertInvisible(self.boolean_correct_answer_block_locator)
-        self.assertInvisible(self.text_correct_answer_block_locator)
-        self.assertInvisible(self.options_locator)
+        self.assertVisibilityIsCorrectForType(extra_type)
 
     def test_integer_correct_answer_cannot_accept_string_value(self):
         self.open_add_question_page()
@@ -428,35 +458,90 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
 
     def test_save_integer_type_question_with_required_fields_only_form_should_be_properly_saved(self):
         self.create_default_categories()
-        self.create_integer_question()
+        self.create_default_integer_question()
 
         self.assertCurrentPageIsQuestionsList()
         self.assertQuestionsListHasNElements(1)
 
-    def test_open_integer_type_for_edit_form_should_be_prepopulated_with_saved_values(self):
-        # fulfill all fields here
-        pass
-
     def test_save_decimal_type_question_with_required_fields_only_form_should_be_properly_saved(self):
         self.create_default_categories()
-        self.create_decimal_question()
+        self.create_default_decimal_question()
 
         self.assertCurrentPageIsQuestionsList()
         self.assertQuestionsListHasNElements(1)
 
     def test_save_boolean_type_question_with_required_fields_only_form_should_be_properly_saved(self):
         self.create_default_categories()
-        self.create_boolean_question()
+        self.create_default_boolean_question()
 
         self.assertCurrentPageIsQuestionsList()
         self.assertQuestionsListHasNElements(1)
 
     def test_save_text_type_question_with_required_fields_only_form_should_be_properly_saved(self):
         self.create_default_categories()
-        self.create_text_question()
+        self.create_default_text_question()
 
         self.assertCurrentPageIsQuestionsList()
         self.assertQuestionsListHasNElements(1)
+
+    def test_open_edit_form_for_simple_question_type_should_be_prepopulated_with_saved_values(self):
+        self.create_default_categories()
+
+        integer_data = QuestionData(**{**self.default_integer_question_data._asdict(), "max_attempts_to_solve": 1,
+                                       "solution": "Some solution text 1"})
+        decimal_data = QuestionData(**{**self.default_decimal_question_data._asdict(), "max_attempts_to_solve": 2,
+                                       "solution": "Some solution text 2"})
+        boolean_data = QuestionData(**{**self.default_boolean_question_data._asdict(), "max_attempts_to_solve": 3,
+                                       "solution": "Some solution text 3"})
+        text_data = QuestionData(**{**self.default_text_question_data._asdict(), "max_attempts_to_solve": 4,
+                                    "solution": "Some solution text 4"})
+        type_to_data = {
+            Question.QuestionType.INTEGER.value: integer_data,
+            Question.QuestionType.DECIMAL.value: decimal_data,
+            Question.QuestionType.BOOLEAN.value: boolean_data,
+            Question.QuestionType.TEXT.value: text_data
+        }
+        func_to_data = [
+            (self.create_integer_question, integer_data),
+            (self.create_decimal_question, decimal_data),
+            (self.create_boolean_question, boolean_data),
+            (self.create_text_question, text_data)
+        ]
+
+        for create_question_func, question_data in func_to_data:
+            create_question_func(question_data)
+
+        for change_link in self.get_change_links_for_questions():
+            self.open_page(change_link)
+
+            question_type = self.get_type_value()
+
+            with self.subTest(question_type=question_type):
+                category_name = self.get_category_name()
+                question = self.get_question_value()
+                complexity = self.get_complexity_value()
+                number_of_points = self.get_number_of_points_value()
+                max_attempts_to_solve = self.get_max_attempts_to_solve_value()
+                correct_answer = self.get_correct_answer_value()
+                solution = self.get_solution_value()
+
+                expected_data = type_to_data[question_type]
+
+                self.assertEqual(expected_data.category_name, category_name)
+                self.assertEqual(expected_data.question, question)
+                self.assertEqual(expected_data.complexity, complexity)
+                self.assertEqual(str(expected_data.number_of_points), number_of_points)
+                self.assertEqual(str(expected_data.max_attempts_to_solve), max_attempts_to_solve)
+                self.assertEqual(str(expected_data.correct_answer), correct_answer)
+                self.assertEqual(expected_data.solution, solution)
+                self.assertVisibilityIsCorrectForType(question_type)
+
+    def assertVisibilityIsCorrectForType(self, question_type):
+        for visible_element in self.elements_visibility_by_type[question_type].visible_elements:
+            self.assertVisible(visible_element)
+
+        for invisible_element in self.elements_visibility_by_type[question_type].invisible_elements:
+            self.assertInvisible(invisible_element)
 
     def assertNOptions(self, number_of_options):
         options = self.find_element(self.options_locator).find_elements_by_css_selector(
@@ -471,10 +556,18 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
         return f"{self.live_server_url}/admin/problems/question/"
 
     def assertQuestionsListHasNElements(self, expected_number_of_questions):
-        question_rows = self.selenium.find_elements_by_css_selector("#result_list tbody tr")
+        question_rows = self.get_questions_rows()
         actual_number_of_questions = len(question_rows)
 
         self.assertEqual(expected_number_of_questions, actual_number_of_questions)
+
+    def get_change_links_for_questions(self):
+        return [link.get_attribute("href")
+                for row in self.get_questions_rows()
+                for link in row.find_elements_by_css_selector(".field-category > a")]
+
+    def get_questions_rows(self):
+        return self.selenium.find_elements_by_css_selector("#result_list tbody tr")
 
     def create_default_categories(self):
         for name in self.default_categories:
@@ -493,26 +586,62 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
         category_select = self.find_category_select()
         category_select.select_by_visible_text(name)
 
+    def get_category_name(self):
+        category_select = self.find_category_select()
+        category_name = category_select.first_selected_option.get_attribute("innerText")
+
+        return category_name
+
     def set_question_value(self, value):
         question_element = self.find_element(self.question_element_locator)
         question_element.send_keys(str(value))
+
+    def get_question_value(self):
+        question_element = self.find_element(self.question_element_locator)
+        question_value = question_element.get_attribute("value")
+
+        return question_value
 
     def set_type_value(self, value):
         type_element = self.find_element(self.type_element_locator)
         type_select = ui.Select(type_element)
         type_select.select_by_value(str(value))
 
+    def get_type_value(self):
+        type_element = self.find_element(self.type_element_locator)
+        type_value = type_element.get_attribute("value")
+
+        return type_value
+
     def set_complexity_value(self, value):
         complexity_element = self.find_element(self.complexity_element_locator)
         complexity_element.send_keys(str(value))
+
+    def get_complexity_value(self):
+        complexity_element = self.find_element(self.complexity_element_locator)
+        complexity_value = complexity_element.get_attribute("value")
+
+        return complexity_value
+
+    def set_number_of_points_value(self, value):
+        number_of_points_element = self.find_element(self.number_of_points_element_locator)
+        number_of_points_element.send_keys(str(value))
+
+    def get_number_of_points_value(self):
+        number_of_points_element = self.find_element(self.number_of_points_element_locator)
+        number_of_points_value = number_of_points_element.get_attribute("value")
+
+        return number_of_points_value
 
     def set_max_attempts_to_solve_value(self, value):
         max_attempts_to_solve_element = self.find_element(self.max_attempts_to_solve_element_locator)
         max_attempts_to_solve_element.send_keys(str(value))
 
-    def set_number_of_points_value(self, value):
-        number_of_points_element = self.find_element(self.number_of_points_element_locator)
-        number_of_points_element.send_keys(str(value))
+    def get_max_attempts_to_solve_value(self):
+        max_attempts_to_solve_element = self.find_element(self.max_attempts_to_solve_element_locator)
+        max_attempts_to_solve_value = max_attempts_to_solve_element.get_attribute("value")
+
+        return max_attempts_to_solve_value
 
     def set_integer_correct_answer_value(self, value):
         integer_correct_answer_element = self.find_element(self.integer_correct_answer_element_locator)
@@ -531,45 +660,81 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
         text_correct_answer_element = self.find_element(self.text_correct_answer_element_locator)
         text_correct_answer_element.send_keys(str(value))
 
-    def create_integer_question(self):
+    def get_correct_answer_value(self):
+        element = None
+        type_value = self.get_type_value()
+
+        if type_value == Question.QuestionType.INTEGER.value:
+            element = self.find_element(self.integer_correct_answer_element_locator)
+        elif type_value == Question.QuestionType.DECIMAL.value:
+            element = self.find_element(self.decimal_correct_answer_element_locator)
+        if type_value == Question.QuestionType.BOOLEAN.value:
+            element = self.find_element(self.boolean_correct_answer_element_locator)
+        elif type_value == Question.QuestionType.TEXT.value:
+            element = self.find_element(self.text_correct_answer_element_locator)
+
+        if element:
+            return element.get_attribute("value")
+        else:
+            return None
+
+    def set_solution_value(self, value):
+        solution_element = self.find_element(self.solution_element_locator)
+        solution_element.send_keys(str(value))
+
+    def get_solution_value(self):
+        solution_element = self.find_element(self.solution_element_locator)
+        solution_value = solution_element.get_attribute("value")
+
+        return solution_value
+
+    def create_default_integer_question(self):
+        self.create_integer_question(self.default_integer_question_data)
+
+    def create_integer_question(self, data: QuestionData):
         self.open_add_question_page()
-        self.set_category_value_by_name("Elementary Algebra")
-        self.set_question_value("2+2=?")
         self.set_type_value(Question.QuestionType.INTEGER.value)
-        self.set_complexity_value(Question.Complexity.EASY.value)
-        self.set_number_of_points_value(1)
-        self.set_integer_correct_answer_value(4)
+        self.set_integer_correct_answer_value(data.correct_answer)
+        self.fill_question_common_fields(data)
         self.submit_form()
 
-    def create_decimal_question(self):
+    def create_default_decimal_question(self):
+        self.create_decimal_question(self.default_decimal_question_data)
+
+    def create_decimal_question(self, data: QuestionData):
         self.open_add_question_page()
-        self.set_category_value_by_name("Elementary Algebra")
-        self.set_question_value("9 / 2 = ?")
         self.set_type_value(Question.QuestionType.DECIMAL.value)
-        self.set_complexity_value(Question.Complexity.EASY.value)
-        self.set_number_of_points_value(1)
-        self.set_decimal_correct_answer_value(4.5)
+        self.set_decimal_correct_answer_value(data.correct_answer)
+        self.fill_question_common_fields(data)
         self.submit_form()
 
-    def create_boolean_question(self):
+    def create_default_boolean_question(self):
+        self.create_boolean_question(self.default_boolean_question_data)
+
+    def create_boolean_question(self, data: QuestionData):
         self.open_add_question_page()
-        self.set_category_value_by_name("Elementary Algebra")
-        self.set_question_value("The logarithm is the inverse function to exponentiation.")
         self.set_type_value(Question.QuestionType.BOOLEAN.value)
-        self.set_complexity_value(Question.Complexity.MEDIUM.value)
-        self.set_number_of_points_value(2)
-        self.set_boolean_correct_answer_value("Yes")
+        self.set_boolean_correct_answer_value(data.correct_answer)
+        self.fill_question_common_fields(data)
         self.submit_form()
 
-    def create_text_question(self):
+    def create_default_text_question(self):
+        self.create_text_question(self.default_text_question_data)
+
+    def create_text_question(self, data: QuestionData):
         self.open_add_question_page()
-        self.set_category_value_by_name("Elementary Algebra")
-        self.set_question_value("What is the inverse function to exponentiation?")
         self.set_type_value(Question.QuestionType.TEXT.value)
-        self.set_complexity_value(Question.Complexity.MEDIUM.value)
-        self.set_number_of_points_value(2)
-        self.set_text_correct_answer_value("Logarithm")
+        self.set_text_correct_answer_value(data.correct_answer)
+        self.fill_question_common_fields(data)
         self.submit_form()
+
+    def fill_question_common_fields(self, data: QuestionData):
+        self.set_category_value_by_name(data.category_name)
+        self.set_question_value(data.question)
+        self.set_complexity_value(data.complexity)
+        self.set_number_of_points_value(data.number_of_points)
+        self.set_max_attempts_to_solve_value(data.max_attempts_to_solve)
+        self.set_solution_value(data.solution)
 
     def submit_form(self):
         save_button = self.find_element(self.save_button_locator)
