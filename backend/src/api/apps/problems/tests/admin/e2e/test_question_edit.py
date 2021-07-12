@@ -1,4 +1,5 @@
 from collections import namedtuple
+from typing import List
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import ui
@@ -13,10 +14,13 @@ QuestionData = namedtuple("QuestionData", [
     "number_of_points",
     "correct_answer",
     "max_attempts_to_solve",
-    "solution"
+    "solution",
+    "options"
 ])
 
 ElementsVisibility = namedtuple("ElementsVisibility", ["visible_elements", "invisible_elements"])
+
+OptionData = namedtuple("OptionData", ["value", "correct"])
 
 
 class QuestionEditTestCase(AdminE2EBaseTestCase):
@@ -84,6 +88,8 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
     save_button_locator = (By.CSS_SELECTOR, ".submit-row [name=_save]")
     errornote_locator = (By.CLASS_NAME, "errornote", "Error note")
     options_locator = (By.ID, "options-group")
+    add_new_option_locator = (By.CSS_SELECTOR, "#options-group tr.add-row a")
+    new_option_row_locator = (By.CSS_SELECTOR, "#options-group tbody tr.form-row.dynamic-options:nth-last-child(3)")
 
     elements_visibility_by_type = {
         Question.QuestionType.INTEGER.value: ElementsVisibility(
@@ -119,14 +125,20 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
     }
 
     default_integer_question_data = QuestionData("Elementary Algebra", "2+2=?", Question.Complexity.EASY.value, 1, 4,
-                                                 None, None)
+                                                 None, None, None)
     default_decimal_question_data = QuestionData("Elementary Algebra", "9/2=?", Question.Complexity.EASY.value, 1, 4.5,
-                                                 None, None)
+                                                 None, None, None)
     default_boolean_question_data = QuestionData("Elementary Algebra",
                                                  "The logarithm is the inverse function to exponentiation.",
-                                                 Question.Complexity.MEDIUM.value, 2, "Yes", None, None)
+                                                 Question.Complexity.MEDIUM.value, 2, "Yes", None, None, None)
     default_text_question_data = QuestionData("Elementary Algebra", "What is the inverse function to exponentiation?",
-                                              Question.Complexity.MEDIUM.value, 1, "Logarithm", None, None)
+                                              Question.Complexity.MEDIUM.value, 1, "Logarithm", None, None, None)
+    default_single_choice_question_data = \
+        QuestionData("Elementary Algebra", "2+2=?", Question.Complexity.EASY.value, 1, None, None, None,
+                     [OptionData("2+2=4", True), OptionData("2+5=6", False)])
+    default_multiple_choice_question_data = \
+        QuestionData("Elementary Algebra", "Select correct statements", Question.Complexity.EASY.value, 1, None, None,
+                     None, [OptionData("2+2=4", True), OptionData("2+5=6", False), OptionData("9*9=81", True)])
 
     def test_default_view_of_add_question_page(self):
         self.open_add_question_page()
@@ -199,7 +211,7 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
         self.assertLabelForFieldMarkedRequired(self.type_element_id)
 
         expected_options = set([("", "---------")] + Question.QuestionType.choices)
-        actual_options = set(self.find_options(type_element))
+        actual_options = set(self.find_select_options(type_element))
 
         self.assertEqual(expected_options, actual_options)
 
@@ -215,7 +227,7 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
         self.assertLabelForFieldMarkedRequired(self.complexity_element_id)
 
         expected_options = set([("", "---------")] + Question.Complexity.choices)
-        actual_options = set(self.find_options(complexity_element))
+        actual_options = set(self.find_select_options(complexity_element))
 
         self.assertEqual(expected_options, actual_options)
 
@@ -276,7 +288,7 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
         self.assertLabelForFieldMarkedRequired(self.boolean_correct_answer_element_id)
 
         expected_options = {("", "---------"), ("Yes", "Yes"), ("No", "No")}
-        actual_options = set(self.find_options(boolean_correct_answer_element))
+        actual_options = set(self.find_select_options(boolean_correct_answer_element))
 
         self.assertEqual(expected_options, actual_options)
 
@@ -350,30 +362,10 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
         self.assertHasValidationErrors(self.max_attempts_to_solve_block_locator,
                                        "Ensure this value is greater than or equal to 1.")
 
-    def test_integer_type_selected_integer_correct_answer_should_be_shown(self):
-        self.open_add_question_page()
-        self.set_type_value(Question.QuestionType.INTEGER.value)
-        self.assertVisibilityIsCorrectForType(Question.QuestionType.INTEGER.value)
-
-    def test_decimal_type_selected_decimal_correct_answer_should_be_shown(self):
-        self.open_add_question_page()
-        self.set_type_value(Question.QuestionType.DECIMAL.value)
-        self.assertVisibilityIsCorrectForType(Question.QuestionType.DECIMAL.value)
-
-    def test_boolean_type_selected_boolean_correct_answer_should_be_shown(self):
-        self.open_add_question_page()
-        self.set_type_value(Question.QuestionType.BOOLEAN.value)
-        self.assertVisibilityIsCorrectForType(Question.QuestionType.BOOLEAN.value)
-
-    def test_text_type_selected_text_correct_answer_should_be_shown(self):
-        self.open_add_question_page()
-        self.set_type_value(Question.QuestionType.TEXT.value)
-        self.assertVisibilityIsCorrectForType(Question.QuestionType.TEXT.value)
-
-    def test_choice_type_selected_options_editor_with_empty_list_should_be_shown(self):
+    def test_visibility_of_elements_based_on_selected_question_type(self):
         self.open_add_question_page()
 
-        for question_type in [Question.QuestionType.SINGLE_CHOICE.value, Question.QuestionType.MULTIPLE_CHOICE.value]:
+        for question_type in self.simple_types + self.complex_types:
             with self.subTest(question_type=question_type):
                 self.set_type_value(question_type)
                 self.assertVisibilityIsCorrectForType(question_type)
@@ -435,27 +427,6 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
                     if locator != selector:
                         self.assertHasNoValidationErrors(locator)
 
-    def test_form_is_filled_with_options_dependent_type_no_options_added_validation_error_should_be_shown(self):
-        self.create_default_categories()
-        self.open_add_question_page()
-
-        self.set_category_value_by_name("Elementary Algebra")
-        self.set_question_value("2+2=?")
-        self.set_complexity_value(Question.Complexity.EASY.value)
-        self.set_number_of_points_value(1)
-
-        for question_type in self.complex_types:
-            with self.subTest(question_type=question_type):
-                self.set_type_value(question_type)
-                self.submit_form()
-
-                self.assertHasValidationErrors(self.options_locator, error_class=None,
-                                               error_message="At least two options should be specified.")
-                self.assertHasNoValidationErrors(self.integer_correct_answer_block_locator)
-                self.assertHasNoValidationErrors(self.decimal_correct_answer_block_locator)
-                self.assertHasNoValidationErrors(self.boolean_correct_answer_block_locator)
-                self.assertHasNoValidationErrors(self.text_correct_answer_block_locator)
-
     def test_save_integer_type_question_with_required_fields_only_form_should_be_properly_saved(self):
         self.create_default_categories()
         self.create_default_integer_question()
@@ -495,17 +466,27 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
                                        "solution": "Some solution text 3"})
         text_data = QuestionData(**{**self.default_text_question_data._asdict(), "max_attempts_to_solve": 4,
                                     "solution": "Some solution text 4"})
+        single_choice_data = QuestionData(
+            **{**self.default_single_choice_question_data._asdict(), "max_attempts_to_solve": 5,
+               "solution": "Some solution text 5"})
+        multiple_choice_data = QuestionData(
+            **{**self.default_single_choice_question_data._asdict(), "max_attempts_to_solve": 6,
+               "solution": "Some solution text 6"})
         type_to_data = {
             Question.QuestionType.INTEGER.value: integer_data,
             Question.QuestionType.DECIMAL.value: decimal_data,
             Question.QuestionType.BOOLEAN.value: boolean_data,
-            Question.QuestionType.TEXT.value: text_data
+            Question.QuestionType.TEXT.value: text_data,
+            Question.QuestionType.SINGLE_CHOICE.value: single_choice_data,
+            Question.QuestionType.MULTIPLE_CHOICE.value: multiple_choice_data
         }
         func_to_data = [
             (self.create_integer_question, integer_data),
             (self.create_decimal_question, decimal_data),
             (self.create_boolean_question, boolean_data),
-            (self.create_text_question, text_data)
+            (self.create_text_question, text_data),
+            (self.create_single_choice_question, single_choice_data),
+            (self.create_multiple_choice_question, multiple_choice_data)
         ]
 
         for create_question_func, question_data in func_to_data:
@@ -517,6 +498,8 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
             question_type = self.get_type_value()
 
             with self.subTest(question_type=question_type):
+                expected_data = type_to_data[question_type]
+
                 category_name = self.get_category_name()
                 question = self.get_question_value()
                 complexity = self.get_complexity_value()
@@ -524,17 +507,158 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
                 max_attempts_to_solve = self.get_max_attempts_to_solve_value()
                 correct_answer = self.get_correct_answer_value()
                 solution = self.get_solution_value()
+                options = self.get_question_options()
 
-                expected_data = type_to_data[question_type]
+                expected_correct_answer = str(
+                    expected_data.correct_answer) if expected_data.correct_answer is not None else None
 
                 self.assertEqual(expected_data.category_name, category_name)
                 self.assertEqual(expected_data.question, question)
                 self.assertEqual(expected_data.complexity, complexity)
                 self.assertEqual(str(expected_data.number_of_points), number_of_points)
                 self.assertEqual(str(expected_data.max_attempts_to_solve), max_attempts_to_solve)
-                self.assertEqual(str(expected_data.correct_answer), correct_answer)
+                self.assertEqual(expected_correct_answer, correct_answer)
                 self.assertEqual(expected_data.solution, solution)
+                self.assertEqual(expected_data.options or [], options)
                 self.assertVisibilityIsCorrectForType(question_type)
+
+    def test_form_is_filled_with_options_dependent_type_correct_answer_inputs_should_not_be_invalid(self):
+        self.create_default_categories()
+        self.open_add_question_page()
+
+        self.set_category_value_by_name("Elementary Algebra")
+        self.set_question_value("2+2=?")
+        self.set_complexity_value(Question.Complexity.EASY.value)
+        self.set_number_of_points_value(1)
+
+        for question_type in self.complex_types:
+            with self.subTest(question_type=question_type):
+                self.set_type_value(question_type)
+                self.submit_form()
+
+                self.assertHasNoValidationErrors(self.integer_correct_answer_block_locator)
+                self.assertHasNoValidationErrors(self.decimal_correct_answer_block_locator)
+                self.assertHasNoValidationErrors(self.boolean_correct_answer_block_locator)
+                self.assertHasNoValidationErrors(self.text_correct_answer_block_locator)
+
+    def test_form_is_filled_with_options_dependent_type_no_options_added_validation_error_should_be_shown(self):
+        self.create_default_categories()
+        self.open_add_question_page()
+
+        self.set_category_value_by_name("Elementary Algebra")
+        self.set_question_value("2+2=?")
+        self.set_complexity_value(Question.Complexity.EASY.value)
+        self.set_number_of_points_value(1)
+
+        for question_type in self.complex_types:
+            with self.subTest(question_type=question_type):
+                self.set_type_value(question_type)
+                self.submit_form()
+
+                self.assertHasValidationErrors(self.options_locator, error_class=None,
+                                               error_message="At least two options should be specified.")
+
+    def test_form_is_filled_with_options_dependent_type_options_empty_validation_error_should_be_shown(self):
+        self.create_default_categories()
+
+        for question_type in self.complex_types:
+            with self.subTest(question_type=question_type):
+                self.open_add_question_page()
+                self.set_category_value_by_name("Elementary Algebra")
+                self.set_question_value("2+2=?")
+                self.set_type_value(question_type)
+                self.set_complexity_value(Question.Complexity.EASY.value)
+                self.set_number_of_points_value(1)
+
+                self.create_option()
+                self.create_option("5")
+                self.create_option()
+                self.submit_form()
+
+                self.assertHasRequiredValidationError("#options-0 .field-value", error_class=None)
+                self.assertHasNoValidationErrors("#options-1 .field-value")
+                self.assertHasRequiredValidationError("#options-2 .field-value", error_class=None)
+
+    def test_form_is_filled_with_options_dependent_type_options_have_duplicates_validation_error_should_be_shown(self):
+        self.create_default_categories()
+
+        for question_type in self.complex_types:
+            with self.subTest(question_type=question_type):
+                self.open_add_question_page()
+                self.set_category_value_by_name("Elementary Algebra")
+                self.set_question_value("2+2=?")
+                self.set_type_value(question_type)
+                self.set_complexity_value(Question.Complexity.EASY.value)
+                self.set_number_of_points_value(1)
+
+                self.create_option("5")
+                self.create_option("5")
+                self.submit_form()
+
+                self.assertHasValidationErrors(self.options_locator, error_class=None,
+                                               error_message="Some options have the same values.")
+
+    def test_form_is_filled_with_options_dependent_type_no_correct_option_chosen_validation_error_should_be_shown(self):
+        self.create_default_categories()
+
+        errors_for_type = {
+            Question.QuestionType.SINGLE_CHOICE.value:
+                "For single choice question type you need to specify exactly one correct option.",
+            Question.QuestionType.MULTIPLE_CHOICE.value:
+                "For multiple choice question type you need to specify at least one correct option."
+        }
+
+        for question_type in self.complex_types:
+            with self.subTest(question_type=question_type):
+                self.open_add_question_page()
+                self.set_category_value_by_name("Elementary Algebra")
+                self.set_question_value("2+2=?")
+                self.set_type_value(question_type)
+                self.set_complexity_value(Question.Complexity.EASY.value)
+                self.set_number_of_points_value(1)
+
+                self.create_option("3")
+                self.create_option("4")
+                self.create_option("5")
+                self.submit_form()
+
+                self.assertHasValidationErrors(self.options_locator, error_class=None,
+                                               error_message=errors_for_type[question_type])
+
+    def test_single_choice_question_correct_option_chosen_should_be_saved_properly(self):
+        self.create_default_categories()
+        self.open_add_question_page()
+        self.set_category_value_by_name("Elementary Algebra")
+        self.set_question_value("2+2=?")
+        self.set_type_value(Question.QuestionType.SINGLE_CHOICE.value)
+        self.set_complexity_value(Question.Complexity.EASY.value)
+        self.set_number_of_points_value(1)
+
+        self.create_option("3")
+        self.create_option("4", True)
+        self.create_option("5")
+        self.submit_form()
+
+        self.assertCurrentPageIsQuestionsList()
+        self.assertQuestionsListHasNElements(1)
+
+    def test_multiple_choice_question_correct_options_chosen_should_be_saved_properly(self):
+        self.create_default_categories()
+        self.open_add_question_page()
+        self.set_category_value_by_name("Elementary Algebra")
+        self.set_question_value("Choose all correct options.")
+        self.set_type_value(Question.QuestionType.MULTIPLE_CHOICE.value)
+        self.set_complexity_value(Question.Complexity.EASY.value)
+        self.set_number_of_points_value(1)
+
+        self.create_option("2+2=4", True)
+        self.create_option("2-3=5", False)
+        self.create_option("3*9=27", True)
+        self.create_option("12/12=1", True)
+        self.submit_form()
+
+        self.assertCurrentPageIsQuestionsList()
+        self.assertQuestionsListHasNElements(1)
 
     def assertVisibilityIsCorrectForType(self, question_type):
         for visible_element in self.elements_visibility_by_type[question_type].visible_elements:
@@ -544,10 +668,7 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
             self.assertInvisible(invisible_element)
 
     def assertNOptions(self, number_of_options):
-        options = self.find_element(self.options_locator).find_elements_by_css_selector(
-            "fieldset.module table tbody tr:not(.add-row, .empty-form)")
-
-        self.assertEqual(number_of_options, len(options))
+        self.assertEqual(number_of_options, len(self.get_question_options()))
 
     def assertCurrentPageIsQuestionsList(self):
         self.assertEqual(self.getQuestionListPage(), self.selenium.current_url)
@@ -688,6 +809,19 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
 
         return solution_value
 
+    def get_question_options(self):
+        options_rows = self.find_element(self.options_locator).find_elements_by_css_selector(
+            "fieldset.module table tbody tr:not(.add-row, .empty-form)")
+        options = []
+
+        for row in options_rows:
+            value = row.find_element_by_css_selector(".field-value input").get_attribute("value")
+            checked = row.find_element_by_css_selector(".field-is_correct input").get_property("checked")
+
+            options.append(OptionData(value, checked))
+
+        return options
+
     def create_default_integer_question(self):
         self.create_integer_question(self.default_integer_question_data)
 
@@ -728,6 +862,26 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
         self.fill_question_common_fields(data)
         self.submit_form()
 
+    def create_default_single_choice_question(self):
+        self.create_single_choice_question(self.default_single_choice_question_data)
+
+    def create_single_choice_question(self, data: QuestionData):
+        self.open_add_question_page()
+        self.set_type_value(Question.QuestionType.SINGLE_CHOICE.value)
+        self.fill_question_common_fields(data)
+        self.fill_options(data.options)
+        self.submit_form()
+
+    def create_default_multiple_choice_question(self):
+        self.create_multiple_choice_question(self.default_multiple_choice_question_data)
+
+    def create_multiple_choice_question(self, data: QuestionData):
+        self.open_add_question_page()
+        self.set_type_value(Question.QuestionType.MULTIPLE_CHOICE.value)
+        self.fill_question_common_fields(data)
+        self.fill_options(data.options)
+        self.submit_form()
+
     def fill_question_common_fields(self, data: QuestionData):
         self.set_category_value_by_name(data.category_name)
         self.set_question_value(data.question)
@@ -735,6 +889,28 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
         self.set_number_of_points_value(data.number_of_points)
         self.set_max_attempts_to_solve_value(data.max_attempts_to_solve)
         self.set_solution_value(data.solution)
+
+    def fill_options(self, options: List[OptionData]):
+        for option in options:
+            self.create_option(option.value, option.correct)
+
+    def create_option(self, value=None, correct=False):
+        question_type = self.get_type_value()
+        is_correct_input_type = "radio" if question_type == Question.QuestionType.SINGLE_CHOICE.value else "checkbox"
+
+        add_option_link = self.find_element(self.add_new_option_locator)
+        add_option_link.click()
+
+        new_option_row = self.find_element(self.new_option_row_locator)
+
+        if value is not None:
+            new_option_row_value_element = new_option_row.find_element_by_css_selector(".field-value input")
+            new_option_row_value_element.send_keys(str(value))
+
+        if correct:
+            new_option_row_correct_element = new_option_row.find_element_by_css_selector(
+                f".field-is_correct input[type={is_correct_input_type}]")
+            new_option_row_correct_element.click()
 
     def submit_form(self):
         save_button = self.find_element(self.save_button_locator)

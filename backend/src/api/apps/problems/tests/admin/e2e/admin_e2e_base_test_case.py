@@ -161,10 +161,10 @@ class AdminE2EBaseTestCase(StaticLiveServerTestCase):
         self.assertDoesNotHaveClass(element, "error")
         self.assertEqual(0, len(inner_validation_errors))
 
-    def assertHasRequiredValidationError(self, locator):
-        self.assertHasValidationErrors(locator, "This field is required.")
+    def assertHasRequiredValidationError(self, locator, error_class="error"):
+        self.assertHasValidationErrors(locator, "This field is required.", error_class=error_class)
 
-    def find_options(self, locator):
+    def find_select_options(self, locator):
         element = self.find_element(locator)
 
         if element.tag_name.lower() == "select":
