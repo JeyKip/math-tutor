@@ -18,6 +18,7 @@ class Option(ChangeDateInfoModel):
         db_table = "problems_questions_options"
         verbose_name = _("Option")
         verbose_name_plural = _("Options")
+        ordering = ["created"]
         constraints = [
             models.UniqueConstraint(fields=("question", "value"), name="question_value_unique_constraint")
         ]

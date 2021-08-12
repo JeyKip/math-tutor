@@ -6,7 +6,17 @@ from api.apps.problems.models import Category
 from api.apps.shared.models import ChangeDateInfoModel
 
 
+class QuestionManager(models.Manager):
+    def all_with_fk(self):
+        return Question.objects.all().select_related("category")
+
+    def all_with_fk_and_many(self):
+        return self.all_with_fk().prefetch_related("options")
+
+
 class Question(ChangeDateInfoModel):
+    objects = QuestionManager()
+
     class QuestionType(models.TextChoices):
         INTEGER = "Integer", _("Integer")
         DECIMAL = "Decimal", _("Decimal")
@@ -46,6 +56,7 @@ class Question(ChangeDateInfoModel):
         db_table = "problems_questions"
         verbose_name = _("Question")
         verbose_name_plural = _("Questions")
+        ordering = ["-created"]
         constraints = [models.CheckConstraint(
             check=models.Q(number_of_points__gte=1) & models.Q(number_of_points__lte=10),
             name="Number of Points is an integer value between 1 and 10"

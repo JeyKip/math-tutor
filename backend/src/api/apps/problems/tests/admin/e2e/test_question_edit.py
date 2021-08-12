@@ -6,6 +6,7 @@ from selenium.webdriver.support import ui
 
 from api.apps.problems.models import Category, Question
 from .admin_e2e_base_test_case import AdminE2EBaseTestCase
+from ...constants import SIMPLE_QUESTION_TYPES, COMPLEX_QUESTION_TYPES, ALL_QUESTION_TYPES
 
 QuestionData = namedtuple("QuestionData", [
     "category_name",
@@ -24,16 +25,6 @@ OptionData = namedtuple("OptionData", ["value", "correct"])
 
 
 class QuestionEditTestCase(AdminE2EBaseTestCase):
-    simple_types = [
-        Question.QuestionType.INTEGER.value,
-        Question.QuestionType.DECIMAL.value,
-        Question.QuestionType.BOOLEAN.value,
-        Question.QuestionType.TEXT.value
-    ]
-    complex_types = [
-        Question.QuestionType.SINGLE_CHOICE.value,
-        Question.QuestionType.MULTIPLE_CHOICE.value
-    ]
     default_categories = [
         "Elementary Algebra",
         "Elementary Geometry",
@@ -365,7 +356,7 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
     def test_visibility_of_elements_based_on_selected_question_type(self):
         self.open_add_question_page()
 
-        for question_type in self.simple_types + self.complex_types:
+        for question_type in ALL_QUESTION_TYPES:
             with self.subTest(question_type=question_type):
                 self.set_type_value(question_type)
                 self.assertVisibilityIsCorrectForType(question_type)
@@ -407,7 +398,6 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
         self.set_complexity_value(Question.Complexity.EASY.value)
         self.set_number_of_points_value(1)
 
-        types_to_check = self.simple_types
         types_corresponding_elements = [
             self.integer_correct_answer_block_locator,
             self.decimal_correct_answer_block_locator,
@@ -415,7 +405,7 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
             self.text_correct_answer_block_locator
         ]
 
-        for question_type, selector in zip(types_to_check, types_corresponding_elements):
+        for question_type, selector in zip(SIMPLE_QUESTION_TYPES, types_corresponding_elements):
             with self.subTest(question_type=question_type):
                 self.set_type_value(question_type)
                 self.submit_form()
@@ -531,7 +521,7 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
         self.set_complexity_value(Question.Complexity.EASY.value)
         self.set_number_of_points_value(1)
 
-        for question_type in self.complex_types:
+        for question_type in COMPLEX_QUESTION_TYPES:
             with self.subTest(question_type=question_type):
                 self.set_type_value(question_type)
                 self.submit_form()
@@ -550,7 +540,7 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
         self.set_complexity_value(Question.Complexity.EASY.value)
         self.set_number_of_points_value(1)
 
-        for question_type in self.complex_types:
+        for question_type in COMPLEX_QUESTION_TYPES:
             with self.subTest(question_type=question_type):
                 self.set_type_value(question_type)
                 self.submit_form()
@@ -561,7 +551,7 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
     def test_form_is_filled_with_options_dependent_type_options_empty_validation_error_should_be_shown(self):
         self.create_default_categories()
 
-        for question_type in self.complex_types:
+        for question_type in COMPLEX_QUESTION_TYPES:
             with self.subTest(question_type=question_type):
                 self.open_add_question_page()
                 self.set_category_value_by_name("Elementary Algebra")
@@ -582,7 +572,7 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
     def test_form_is_filled_with_options_dependent_type_options_have_duplicates_validation_error_should_be_shown(self):
         self.create_default_categories()
 
-        for question_type in self.complex_types:
+        for question_type in COMPLEX_QUESTION_TYPES:
             with self.subTest(question_type=question_type):
                 self.open_add_question_page()
                 self.set_category_value_by_name("Elementary Algebra")
@@ -608,7 +598,7 @@ class QuestionEditTestCase(AdminE2EBaseTestCase):
                 "For multiple choice question type you need to specify at least one correct option."
         }
 
-        for question_type in self.complex_types:
+        for question_type in COMPLEX_QUESTION_TYPES:
             with self.subTest(question_type=question_type):
                 self.open_add_question_page()
                 self.set_category_value_by_name("Elementary Algebra")
